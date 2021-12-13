@@ -9,9 +9,13 @@ using elem = std::variant<int, double, std::string>;
 using tuple = std::vector<elem>;
 
 namespace {
-    template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-    template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
-}
+template <class... Ts>
+struct overloaded : Ts... {
+    using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+}  // namespace
 
 class tuplespace {
     // used by put, try_copy and try_take
@@ -31,7 +35,7 @@ class tuplespace {
         std::unique_lock lock(*mutex);
 
         auto goalsize = sizeof...(args);
-        ptuple goal{ args... };
+        ptuple goal{args...};
 
         auto begin = tuples.begin();
         auto end = tuples.end();
@@ -64,10 +68,11 @@ class tuplespace {
             for (auto i = 0u; i < size; i++) {
                 auto rhs = current[i];
 
-                std::visit(overloaded {
-                    [&]<typename t>(t* arg) { *arg = std::get<t>(current[i]); },
-                    [&](auto) { },
-                }, goal[i]);
+                std::visit(overloaded{
+                               [&]<typename t>(t* arg) { *arg = std::get<t>(current[i]); },
+                               [&](auto) {},
+                           },
+                           goal[i]);
             }
 
             if (remove)
@@ -75,7 +80,7 @@ class tuplespace {
 
             return true;
 
-            nexttuple: ;
+        nexttuple:;
         }
         return false;
     }
@@ -87,14 +92,15 @@ class tuplespace {
 
             if (try_copytake(remove, args...)) {
                 tuple ret{};
-                ptuple found{ args... };
+                ptuple found{args...};
                 for (const auto& pt : found) {
                     elem e;
 
-                    std::visit(overloaded {
-                            [&]<typename t>(t* arg) { e = *arg; },
-                            [&](auto arg) { e = arg; },
-                            }, pt);
+                    std::visit(overloaded{
+                                   [&]<typename t>(t* arg) { e = *arg; },
+                                   [&](auto arg) { e = arg; },
+                               },
+                               pt);
                     ret.push_back(e);
                 }
                 return ret;
@@ -110,7 +116,7 @@ class tuplespace {
         {
             std::unique_lock<std::mutex> cv_lock(*cv_mutex);
             std::unique_lock lock(*mutex);
-            tuples.insert(ptuple{ args... });
+            tuples.insert(ptuple{args...});
         }
         cv->notify_all();
     }
@@ -140,9 +146,8 @@ std::ostream& operator<<(std::ostream& os, const tuple& t) {
     os << "{";
     auto sep = " ";
     for (const auto& elem : t) {
-        std::visit([&](const auto& arg){ os << sep << arg; }, elem);
+        std::visit([&](const auto& arg) { os << sep << arg; }, elem);
         sep = ", ";
     }
     return os << " }";
 }
-

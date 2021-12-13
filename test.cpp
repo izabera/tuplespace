@@ -1,31 +1,31 @@
-#include <iostream>
-#include <chrono>
-#include <thread>
 #include <unistd.h>
+#include <chrono>
+#include <iostream>
+#include <thread>
 
 #include "tuplespace.hpp"
 
 using namespace std::chrono_literals;
 
 namespace {
-    enum { ok, warning, error, reset };
-    class escapes {
-        std::string esc[4]{};
+enum { ok, warning, error, reset };
+class escapes {
+    std::string esc[4]{};
 
-       public:
-        escapes() {
-            if (::isatty(1)) {
-                esc[ok] = "\x1b[32m";
-                esc[warning] = "\x1b[33m";
-                esc[error] = "\x1b[31m";
-                esc[reset] = "\x1b[m";
-            }
+   public:
+    escapes() {
+        if (::isatty(1)) {
+            esc[ok] = "\x1b[32m";
+            esc[warning] = "\x1b[33m";
+            esc[error] = "\x1b[31m";
+            esc[reset] = "\x1b[m";
         }
+    }
 
-        auto operator[](int i) { return esc[i]; }
-    };
-    escapes escapes;
-}
+    auto operator[](int i) { return esc[i]; }
+};
+escapes escapes;
+}  // namespace
 
 template <typename t>
 bool test(t actual, std::string actualname, t expected, std::string expectedname) {
@@ -33,14 +33,14 @@ bool test(t actual, std::string actualname, t expected, std::string expectedname
 
     auto slen = actualname.size() + 4 + expectedname.size() - 6;
     std::string dots(slen < 80 ? 80 - slen : 0, '.');
-    std::cout << escapes[ret ? ok : error]
-              << actualname << " == " << expectedname
-              << dots << (ret ? "[PASS]" : "[FAIL]")
+    std::cout << escapes[ret ? ok : error]             //
+              << actualname << " == " << expectedname  //
+              << dots << (ret ? "[PASS]" : "[FAIL]")   //
               << escapes[reset] << '\n';
     return ret;
 }
 
-#define test(x,y) test(x, #x, y, #y)
+#define test(x, y) test(x, #x, y, #y)
 int main() {
     tuplespace t{};
     t.put(3, 1.2, "meow", 4);
@@ -83,12 +83,12 @@ int main() {
     int nthreads = std::thread::hardware_concurrency();
     std::vector<std::thread> threads;
     for (auto i = 0; i < nthreads; i++) {
-        threads.push_back(std::thread( [&] {
+        threads.push_back(std::thread([&] {
             std::this_thread::sleep_for(1s);
             for (auto j = 0; j < limit; j++) {
                 t.put("threadtest", j);
             }
-            }));
+        }));
     }
 
     for (auto& thr : threads)
@@ -98,7 +98,7 @@ int main() {
     threads.clear();
     std::vector<int> sums(nthreads);
     for (auto i = 0; i < nthreads; i++) {
-        threads.push_back(std::thread( [&, i] {
+        threads.push_back(std::thread([&, i] {
             std::this_thread::sleep_for(1s);
             while (1) {
                 int val;
@@ -106,12 +106,11 @@ int main() {
                     break;
                 sums[i] += val;
             }
-            }));
+        }));
     }
 
     for (auto& thr : threads)
         thr.join();
-
 
     auto total = 0;
     for (auto s : sums)
@@ -124,5 +123,5 @@ int main() {
         sep = ", ";
     }
     std::cerr << " } (total=" << total << ")\n";
-    test(total, nthreads * (limit -1) * limit / 2);
+    test(total, nthreads * (limit - 1) * limit / 2);
 }
