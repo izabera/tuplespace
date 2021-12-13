@@ -101,8 +101,8 @@ class simpletuplespace {
                 }
                 return ret;
             }
-            cv->wait(cv_lock);
             // wait until more tuples are put in
+            cv->wait(cv_lock);
         }
     }
 
@@ -199,13 +199,20 @@ int main() {
     test(t.try_take(44, "meow"), true);
     test(t.try_take(44, "meow"), false);
 
-    std::thread thr([&] {
+    std::thread thr1([&] {
         std::this_thread::sleep_for(2s);
+        t.put("aqq", "zzz");
+    });
+
+    std::thread thr2([&] {
+        std::this_thread::sleep_for(3s);
         t.put("qqq", "zzz");
     });
 
     std::string s;
-    t.take("qqq", &s);
+    std::cout << "this should take ~3 seconds" << std::endl;
+    std::cout << t.take("qqq", &s) << '\n';
     std::cout << s << '\n';
-    thr.join();
+    thr1.join();
+    thr2.join();
 }
