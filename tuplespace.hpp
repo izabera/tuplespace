@@ -1,21 +1,19 @@
-#include <iostream>
-#include <chrono>
-#include <thread>
 #include <condition_variable>
-#include <memory>
+#include <iostream>
 #include <set>
-#include <mutex>
+#include <thread>
 #include <variant>
 #include <vector>
-using namespace std::chrono_literals;
 
 using elem = std::variant<int, double, std::string>;
 using tuple = std::vector<elem>;
 
-template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
-template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+namespace {
+    template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+    template<class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
+}
 
-class simpletuplespace {
+class tuplespace {
     // used by put, try_copy and try_take
     std::unique_ptr<std::mutex> mutex = std::make_unique<std::mutex>();
 
@@ -109,9 +107,9 @@ class simpletuplespace {
    public:
     template <typename... targs>
     void put(targs... args) {
-        std::unique_lock lock(*mutex);
         {
             std::unique_lock<std::mutex> cv_lock(*cv_mutex);
+            std::unique_lock lock(*mutex);
             tuples.insert(ptuple{ args... });
         }
         cv->notify_all();
@@ -148,71 +146,3 @@ std::ostream& operator<<(std::ostream& os, const tuple& t) {
     return os << " }";
 }
 
-namespace {
-    enum { ok, warning, error, reset };
-    class escapes {
-        std::string esc[4]{};
-
-       public:
-        escapes() {
-            if (isatty(1)) {
-                esc[ok] = "\x1b[32m";
-                esc[warning] = "\x1b[33m";
-                esc[error] = "\x1b[31m";
-                esc[reset] = "\x1b[m";
-            }
-        }
-
-        auto operator[](int i) { return esc[i]; }
-    };
-    escapes escapes;
-}
-
-template <typename t>
-bool test(t actual, std::string actualname, t expected, std::string expectedname) {
-    bool ret = actual == expected;
-
-    std::cout << escapes[ret ? ok : error]
-              << actualname << " == " << expectedname
-              << escapes[reset] << '\n';
-    return ret;
-}
-
-#define test(x,y) test(x, #x, y, #y)
-int main() {
-    simpletuplespace t{};
-    t.put(3, 1.2, "meow", 4);
-    t.put(3, 1.2, "meow", 4);
-    t.put(44, "meow");
-
-    test(t.try_copy(3, 1.2, "meow", 4), true);
-    test(t.try_copy(3, 1.2, "thiswillfail", 4), false);
-
-    int p;
-    test(t.try_copy(&p, 1.2, "meow", 4), true);
-    test(p, 3);
-
-    test(t.try_copy(44, "meow"), true);
-    test(t.try_copy(44, "meow"), true);
-    test(t.try_copy(44, "meow"), true);
-    std::cout << t.copy(44, "meow") << '\n';
-    test(t.try_take(44, "meow"), true);
-    test(t.try_take(44, "meow"), false);
-
-    std::thread thr1([&] {
-        std::this_thread::sleep_for(2s);
-        t.put("aqq", "zzz");
-    });
-
-    std::thread thr2([&] {
-        std::this_thread::sleep_for(3s);
-        t.put("qqq", "zzz");
-    });
-
-    std::string s;
-    std::cout << "this should take ~3 seconds" << std::endl;
-    std::cout << t.take("qqq", &s) << '\n';
-    std::cout << s << '\n';
-    thr1.join();
-    thr2.join();
-}
